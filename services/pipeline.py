@@ -15,6 +15,17 @@ from services.translation.nllb_translator import NLLBTranslator, get_nllb_transl
 logger = logging.getLogger(__name__)
 
 
+def verdict_from_lstm_probability(lstm_prob: float, thr: float) -> Tuple[bool, float, str]:
+    """
+    Map P(fake) to (is_fake, confidence_in_predicted_class, method_tag).
+    Uses the threshold only — no forced ORIGINAL band near 0.5.
+    """
+    is_fake = lstm_prob > thr
+    confidence = float(lstm_prob if is_fake else 1.0 - lstm_prob)
+    confidence = min(max(confidence, 0.0), 0.99)
+    return bool(is_fake), confidence, "lstm_local"
+
+
 class KannadaNewsAnalyzer:
     """
     Local pipeline: Kannada → English (NLLB) → LSTM fake probability + heuristic metadata.
@@ -56,15 +67,7 @@ class KannadaNewsAnalyzer:
         logger.debug("LSTM status=%s P(fake)=%.4f", lstm_status, lstm_prob)
 
         thr = float(self.settings.LSTM_FAKE_THRESHOLD)
-        margin = float(self.settings.LSTM_UNCERTAIN_MARGIN)
-        if abs(lstm_prob - 0.5) <= margin:
-            is_fake = False
-            confidence = 0.5 + abs(lstm_prob - 0.5)
-            method = "lstm_local_uncertain_original"
-        else:
-            is_fake = lstm_prob > thr
-            confidence = lstm_prob if is_fake else 1.0 - lstm_prob
-            method = "lstm_local"
+        is_fake, confidence, method = verdict_from_lstm_probability(lstm_prob, thr)
 
         category, cat_conf = infer_category(english_text)
         summary = infer_summary(english_text)

@@ -10,7 +10,8 @@
     <div class="col-lg-8">
         <div class="analysis-card">
             <h3><i class="fas fa-search"></i> News Analysis</h3>
-            <form method="POST" action="{{ url_for('analyze') }}" id="analysisForm">
+            <form method="POST" action="{{ url_for('analyze') }}" id="analysisForm"
+                  data-submit-loading-html='<i class="fas fa-spinner fa-spin"></i> Analyzing...'>
                 <div class="mb-3">
                     <label for="kannada_text" class="form-label">Enter Kannada News Text</label>
                     <textarea class="form-control" id="kannada_text" name="kannada_text" 
@@ -227,19 +228,13 @@ document.getElementById('kannada_text').addEventListener('input', function() {
 // Form submission handler
 document.getElementById('analysisForm').addEventListener('submit', function(e) {
     const kannadaText = document.getElementById('kannada_text').value.trim();
-    const analyzeBtn = document.getElementById('analyzeBtn');
-    
+
     if (kannadaText.length < 3) {
         e.preventDefault();
         alert('Please enter at least 3 characters of text for analysis.');
         return;
     }
-    
-    // Show loading state
-    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
-    analyzeBtn.disabled = true;
-    
-    // Allow form to submit normally
+    // Loading UI + disable: handled in static/js/script.js (also resets on bfcache pageshow).
 });
 
 // Sample text insertion for testing

@@ -25,7 +25,6 @@ def main() -> None:
     print("Type 'quit' to exit. For full Kn→En + calibrated verdict use: python final.py")
 
     thr = float(settings.LSTM_FAKE_THRESHOLD)
-    margin = float(settings.LSTM_UNCERTAIN_MARGIN)
 
     while True:
         user_input = input("Enter text: ").strip()
@@ -35,16 +34,10 @@ def main() -> None:
             print("Text too short.")
             continue
         prob, status = classifier.predict_fake_probability(user_input)
-        if abs(prob - 0.5) <= margin:
-            label = "ORIGINAL"
-            conf = 0.5 + abs(prob - 0.5)
-            note = " (uncertain→original)"
-        else:
-            is_fake = prob > thr
-            label = "FAKE" if is_fake else "ORIGINAL"
-            conf = prob if is_fake else 1 - prob
-            note = ""
-        print(f"  {label}{note}  P(fake)={prob:.3f}  thr={thr}  confidence={conf:.2%}  ({status})")
+        is_fake = prob > thr
+        label = "FAKE" if is_fake else "ORIGINAL"
+        conf = prob if is_fake else 1 - prob
+        print(f"  {label}  P(fake)={prob:.3f}  thr={thr}  confidence={conf:.2%}  ({status})")
 
 
 if __name__ == "__main__":

@@ -34,8 +34,6 @@ class Settings:
 
     TORCH_NUM_THREADS = int(os.environ.get("TORCH_NUM_THREADS", "4"))
 
-    # LSTM was trained on Kannada labels: 0=real, 1=fake. Output is P(fake).
-    # Raise threshold to reduce false "FAKE" when the model is uncertain or miscalibrated.
+    # LSTM: 0=real, 1=fake; output is P(fake). Default 0.55 avoids "everything FAKE" when
+    # the model sits just above 0.5. Raise (e.g. 0.6) if still too many FAKE; lower only with care.
     LSTM_FAKE_THRESHOLD = float(os.environ.get("LSTM_FAKE_THRESHOLD", "0.55"))
-    # If |P(fake)-0.5| <= margin, treat as uncertain and label ORIGINAL (safe default).
-    LSTM_UNCERTAIN_MARGIN = float(os.environ.get("LSTM_UNCERTAIN_MARGIN", "0.08"))
