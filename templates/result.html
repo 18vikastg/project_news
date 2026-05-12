@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="result-header text-center mb-5">
+    <h1><i class="fas fa-chart-line"></i> Analysis Results</h1>
+    <p class="lead">Detailed analysis of your Kannada news content</p>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="result-card">
+            <h3><i class="fas fa-text-height"></i> Input Text</h3>
+            <div class="text-display">
+                <strong>Kannada:</strong>
+                <p class="kannada-text">{{ kannada_text }}</p>
+                <strong>English Translation:</strong>
+                <p class="english-text">{{ english_text }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="result-card">
+            <h3><i class="fas fa-analytics"></i> Analysis Summary</h3>
+            <div class="summary-box">
+                <p>{{ prediction.summary }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="result-card">
+            <h3><i class="fas fa-shield-alt"></i> Authenticity Analysis</h3>
+            <div class="authenticity-result text-center">
+                {% if prediction.is_fake %}
+                    <div class="fake-news-result">
+                        <i class="fas fa-times-circle fa-4x"></i>
+                        <h2 class="text-danger">FAKE</h2>
+                        <p class="text-muted mb-0">This item is classified as likely fake or misleading.</p>
+                    </div>
+                {% else %}
+                    <div class="real-news-result">
+                        <i class="fas fa-check-circle fa-4x"></i>
+                        <h2 class="text-success">ORIGINAL</h2>
+                        <p class="text-muted mb-0">This item is classified as likely authentic.</p>
+                    </div>
+                {% endif %}
+                <div class="confidence-meter mt-3">
+                    <div class="confidence-label">
+                        Confidence: {{ "%.1f"|format(prediction.confidence * 100) }}%
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar {% if prediction.is_fake %}bg-danger{% else %}bg-success{% endif %}" 
+                             style="width: {{ prediction.confidence * 100 }}%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="result-card">
+            <h3><i class="fas fa-tags"></i> Category & Details</h3>
+            <div class="category-info">
+                <div class="category-display {{ prediction.category }}">
+                    <i class="fas fa-tag"></i>
+                    <span class="category-name">{{ prediction.category|title }}</span>
+                    <span class="category-confidence">{{ "%.1f"|format(prediction.category_confidence * 100) }}%</span>
+                </div>
+                
+                <div class="analysis-details mt-3">
+                    <div class="detail-item">
+                        <strong>Analysis Method:</strong>
+                        <span>{{ prediction.analysis_method|replace('_', ' ')|title }}</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Translation Quality:</strong>
+                        <span class="quality-{{ prediction.translation_quality }}">
+                            {{ prediction.translation_quality|title }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-primary me-2">
+        <i class="fas fa-redo"></i> Analyze Another
+    </a>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+        <i class="fas fa-tachometer-alt"></i> Back to Dashboard
+    </a>
+</div>
+{% endblock %}

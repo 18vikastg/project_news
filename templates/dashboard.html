@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-header mb-4">
+    <h1><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+    <p class="lead">Welcome, {{ current_user.username }}! Analyze Kannada news for authenticity.</p>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="analysis-card">
+            <h3><i class="fas fa-search"></i> News Analysis</h3>
+            <form method="POST" action="{{ url_for('analyze') }}" id="analysisForm">
+                <div class="mb-3">
+                    <label for="kannada_text" class="form-label">Enter Kannada News Text</label>
+                    <textarea class="form-control" id="kannada_text" name="kannada_text" 
+                              rows="6" placeholder="Enter Kannada news content here..." 
+                              required oninput="debouncedTranslate()"></textarea>
+                    <div class="form-text">
+                        Enter at least 5 characters of Kannada text for analysis.
+                    </div>
+                </div>
+
+                <!-- Real-time Translation Preview -->
+                <div class="translation-preview mb-3" id="translationPreview" style="display: none;">
+                    <h5><i class="fas fa-language"></i> English Translation Preview</h5>
+                    <div class="translation-box">
+                        <div id="translationText" class="translation-text"></div>
+                        <div class="translation-status" id="translationStatus"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="analyzeBtn">
+                    <i class="fas fa-analytics"></i> Analyze News
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="info-sidebar">
+            <h4><i class="fas fa-lightbulb"></i> Tips for Better Analysis</h4>
+            <ul>
+                <li>Provide complete news sentences</li>
+                <li>Avoid very short texts</li>
+                <li>Use proper Kannada characters</li>
+                <li>Include context when possible</li>
+            </ul>
+            
+            <h4><i class="fas fa-chart-bar"></i> Categories</h4>
+            <div class="category-tags">
+                <span class="category-tag entertainment">Entertainment</span>
+                <span class="category-tag sports">Sports</span>
+                <span class="category-tag tech">Technology</span>
+                <span class="category-tag other">Other</span>
+            </div>
+
+            <h4><i class="fas fa-info-circle"></i> About Translation</h4>
+            <p class="small">
+                Kannada is translated locally with an open-source NLLB model (no external API keys).
+                First run may download model weights; analysis runs fully on your server.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="history-section mt-5">
+    <h3><i class="fas fa-history"></i> Recent Analysis History</h3>
+    {% if history %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Kannada Text</th>
+                        <th>English Translation</th>
+                        <th>Result</th>
+                        <th>Category</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in history %}
+                    <tr>
+                        <td>{{ item['created_at'][:16] }}</td>
+                        <td class="text-truncate" style="max-width: 150px;" title="{{ item['kannada_text'] }}">
+                            {{ item['kannada_text'] }}
+                        </td>
+                        <td class="text-truncate" style="max-width: 150px;" title="{{ item['english_translation'] }}">
+                            {{ item['english_translation'] }}
+                        </td>
+                        <td>
+                            {% if item['is_fake'] %}
+                                <span class="badge bg-danger">FAKE</span>
+                            {% else %}
+                                <span class="badge bg-success">ORIGINAL</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="category-badge {{ item['category'] }}">{{ item['category'] }}</span>
+                        </td>
+                        <td>{{ "%.0f"|format(item['confidence'] * 100) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-inbox fa-3x mb-3 text-muted"></i>
+            <p class="text-muted">No analysis history yet. Start by analyzing some news!</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let translationTimeout;
+
+function debouncedTranslate() {
+    clearTimeout(translationTimeout);
+    translationTimeout = setTimeout(translateText, 800); // Reduced delay
+}
+
+function translateText() {
+    const kannadaText = document.getElementById('kannada_text').value.trim();
+    const translationPreview = document.getElementById('translationPreview');
+    const translationText = document.getElementById('translationText');
+    const translationStatus = document.getElementById('translationStatus');
+    
+    if (kannadaText.length < 2) {
+        translationPreview.style.display = 'none';
+        return;
+    }
+    
+    // Show loading state
+    translationPreview.style.display = 'block';
+    translationText.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Translating...</div>';
+    translationStatus.innerHTML = '';
+    
+    fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: kannadaText })
+    })
+    .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const msg = (data.english_translation || data.error || 'Translation service unavailable');
+            translationText.innerHTML = `
+                <div class="alert alert-warning">
+                    <strong>English:</strong> ${String(msg).replace(/</g, '&lt;')}
+                </div>
+            `;
+            translationStatus.innerHTML = '<span class="badge bg-secondary">Offline</span>';
+            return;
+        }
+        const en = data.english_translation != null ? String(data.english_translation) : '';
+        translationText.innerHTML = `
+            <div class="translation-result">
+                <strong>English:</strong> ${en.replace(/</g, '&lt;')}
+            </div>
+        `;
+        if (data.quality === 'good') {
+            translationStatus.innerHTML = '<span class="badge bg-success">Good Translation</span>';
+        } else if (data.quality === 'fair') {
+            translationStatus.innerHTML = '<span class="badge bg-warning">Fair Translation</span>';
+        } else {
+            translationStatus.innerHTML = '<span class="badge bg-danger">Poor Translation</span>';
+            const low = en.toLowerCase();
+            if (low.includes('unable') || low.includes('unavailable') || low.includes('not loaded')) {
+                translationText.innerHTML += `
+                    <div class="alert alert-info mt-2 small">
+                        <i class="fas fa-info-circle"></i>
+                        The translation service is currently experiencing issues. You can still analyze the text.
+                    </div>
+                `;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Translation error:', error);
+        translationText.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> 
+                Translation service temporarily unavailable. You can still analyze the text.
+            </div>
+        `;
+        translationStatus.innerHTML = '<span class="badge bg-secondary">Offline</span>';
+    });
+}
+// Add character counter and validation
+document.getElementById('kannada_text').addEventListener('input', function() {
+    const charCount = this.value.length;
+    const counter = document.getElementById('charCounter') || (function() {
+        const counter = document.createElement('div');
+        counter.id = 'charCounter';
+        counter.className = 'form-text text-end';
+        this.parentNode.appendChild(counter);
+        return counter;
+    }).call(this);
+    
+    counter.textContent = `${charCount} characters`;
+    
+    // Color code based on length
+    if (charCount === 0) {
+        counter.className = 'form-text text-end text-muted';
+    } else if (charCount < 5) {
+        counter.className = 'form-text text-end text-warning';
+        counter.innerHTML += ' <i class="fas fa-exclamation-triangle"></i> Text is short';
+    } else if (charCount < 10) {
+        counter.className = 'form-text text-end text-info';
+    } else {
+        counter.className = 'form-text text-end text-success';
+        counter.innerHTML += ' <i class="fas fa-check"></i> Good length';
+    }
+    
+    // Auto-translate for longer texts
+    if (charCount >= 3) {
+        debouncedTranslate();
+    }
+});
+
+// Form submission handler
+document.getElementById('analysisForm').addEventListener('submit', function(e) {
+    const kannadaText = document.getElementById('kannada_text').value.trim();
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    
+    if (kannadaText.length < 3) {
+        e.preventDefault();
+        alert('Please enter at least 3 characters of text for analysis.');
+        return;
+    }
+    
+    // Show loading state
+    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    analyzeBtn.disabled = true;
+    
+    // Allow form to submit normally
+});
+
+// Sample text insertion for testing
+function insertSampleText() {
+    const sampleTexts = [
+        "ನಿಮ್ಮ ಡೆಬಿಟ್ ಕಾರ್ಡ್ ತಕ್ಷಣವೇ ಬ್ಲಾಕ್ ಆಗುತ್ತದೆ",
+        "ಕ್ರಿಕೆಟ್‌ನಲ್ಲಿ ಭಾರತ ವಿಶ್ವಕಪ್ ಗೆದ್ದಿತು",
+        "ನೂತನ ಐಫೋನ್ ಬಿಡುಗಡೆಯಾಗಿದೆ",
+        "ಬಿಟ್‌ಕಾಯಿನ್‌ನಲ್ಲಿ ದೊಡ್ಡ ಏರಿಕೆ",
+        "ಕಬಡ್ಡಿ ತಂಡ ಚಾಂಪಿಯನ್‌ಶಿಪ್ ಗೆದ್ದಿತು"
+    ];
+    
+    const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
+    document.getElementById('kannada_text').value = randomText;
+    document.getElementById('kannada_text').dispatchEvent(new Event('input'));
+}
+
+// Add sample text button if not exists
+document.addEventListener('DOMContentLoaded', function() {
+    const formGroup = document.querySelector('.mb-3');
+    if (formGroup && !document.getElementById('sampleTextBtn')) {
+        const sampleButton = document.createElement('button');
+        sampleButton.type = 'button';
+        sampleButton.id = 'sampleTextBtn';
+        sampleButton.className = 'btn btn-outline-secondary btn-sm mt-2';
+        sampleButton.innerHTML = '<i class="fas fa-magic"></i> Try Sample Text';
+        sampleButton.onclick = insertSampleText;
+        formGroup.appendChild(sampleButton);
+    }
+});
+</script>
+{% endblock %}
