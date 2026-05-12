@@ -39,6 +39,8 @@ If `pip install torch` is slow or fails, install `torch` first from the official
 | `CHUNK_MAX_CHARS` | `400` | Chunk size for long articles |
 | `WARMUP_TRANSLATOR` | `0` | Set to `1` to translate a short string on startup |
 | `TORCH_NUM_THREADS` | `4` | CPU threads for PyTorch |
+| `LSTM_FAKE_THRESHOLD` | `0.55` | Label **FAKE** only if P(fake) is above this (tune 0.52–0.65). |
+| `LSTM_UNCERTAIN_MARGIN` | `0.08` | If \\|P(fake)−0.5\\| ≤ margin → treat as uncertain and show **ORIGINAL**. |
 | `PORT` | `5000` | Dev server port |
 | `FLASK_DEBUG` | `0` | Set to `1` for debug mode |
 
@@ -46,7 +48,7 @@ If `pip install torch` is slow or fails, install `torch` first from the official
 
 The bundled `tokenizer.pkl` was produced with legacy **`keras_preprocessing.text.Tokenizer`**. The app registers a small import shim so it loads under modern TensorFlow.
 
-Training defaults in `training.py` use **Kannada** text (`USE_TRANSLATION = False`). The **web app** translates to **English** and runs the LSTM with English-only preprocessing. For best accuracy when training with English labels, set `USE_TRANSLATION = True` in `training.py` (uses the same local NLLB path; slow on CPU) or pre-translate your CSV offline.
+Training defaults in `training.py` use **Kannada** text (`USE_TRANSLATION = False`). The **LSTM** in the web app scores **the original Kannada** with the same `preprocess_text` rules as training. English from NLLB is used for display, category heuristics, and summary only.
 
 ## Local run
 

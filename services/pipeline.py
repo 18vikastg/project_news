@@ -51,11 +51,21 @@ class KannadaNewsAnalyzer:
 
     def combined_analysis(self, kannada_text: str) -> Tuple[dict[str, Any], str]:
         english_text = self.translate_kannada_to_english(kannada_text)
-        lstm_prob, lstm_status = self._lstm.predict_fake_probability(english_text)
-        logger.debug("LSTM status=%s prob=%.4f", lstm_status, lstm_prob)
+        # LSTM must see Kannada — same distribution as training (not English ASCII).
+        lstm_prob, lstm_status = self._lstm.predict_fake_probability(kannada_text)
+        logger.debug("LSTM status=%s P(fake)=%.4f", lstm_status, lstm_prob)
 
-        is_fake = lstm_prob > 0.5
-        confidence = lstm_prob if is_fake else 1.0 - lstm_prob
+        thr = float(self.settings.LSTM_FAKE_THRESHOLD)
+        margin = float(self.settings.LSTM_UNCERTAIN_MARGIN)
+        if abs(lstm_prob - 0.5) <= margin:
+            is_fake = False
+            confidence = 0.5 + abs(lstm_prob - 0.5)
+            method = "lstm_local_uncertain_original"
+        else:
+            is_fake = lstm_prob > thr
+            confidence = lstm_prob if is_fake else 1.0 - lstm_prob
+            method = "lstm_local"
+
         category, cat_conf = infer_category(english_text)
         summary = infer_summary(english_text)
         tq = infer_translation_quality(kannada_text, english_text)
@@ -66,7 +76,7 @@ class KannadaNewsAnalyzer:
             "category": category,
             "category_confidence": float(cat_conf),
             "summary": summary,
-            "analysis_method": "lstm_local",
+            "analysis_method": method,
             "translation_quality": tq,
         }
         return prediction, english_text

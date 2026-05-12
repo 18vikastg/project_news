@@ -1,11 +1,8 @@
 """
-Interactive LSTM-only tester (Kannada in, uses same preprocessing as production LSTM path
-only when text is English-like; for raw Kannada use the full app or final.py pipeline).
+Interactive LSTM-only tester: Kannada in, same preprocessing as training/production.
 """
 
 from __future__ import annotations
-
-import sys
 
 from services.classification.lstm_service import LSTMNewsClassifier
 from config.settings import Settings
@@ -24,8 +21,11 @@ def main() -> None:
         print(f"Error loading model: {e}")
         return
 
-    print("Kannada News Fake Detection (LSTM on English-like tokens)")
-    print("Type 'quit' to exit. For full Kn→En→LSTM use: python final.py")
+    print("Kannada News Fake Detection (LSTM on Kannada text, same as training)")
+    print("Type 'quit' to exit. For full Kn→En + calibrated verdict use: python final.py")
+
+    thr = float(settings.LSTM_FAKE_THRESHOLD)
+    margin = float(settings.LSTM_UNCERTAIN_MARGIN)
 
     while True:
         user_input = input("Enter text: ").strip()
@@ -35,10 +35,16 @@ def main() -> None:
             print("Text too short.")
             continue
         prob, status = classifier.predict_fake_probability(user_input)
-        is_fake = prob > 0.5
-        conf = prob if is_fake else 1 - prob
-        label = "FAKE" if is_fake else "ORIGINAL"
-        print(f"  {label}  P(fake)={prob:.3f}  confidence={conf:.2%}  ({status})")
+        if abs(prob - 0.5) <= margin:
+            label = "ORIGINAL"
+            conf = 0.5 + abs(prob - 0.5)
+            note = " (uncertain→original)"
+        else:
+            is_fake = prob > thr
+            label = "FAKE" if is_fake else "ORIGINAL"
+            conf = prob if is_fake else 1 - prob
+            note = ""
+        print(f"  {label}{note}  P(fake)={prob:.3f}  thr={thr}  confidence={conf:.2%}  ({status})")
 
 
 if __name__ == "__main__":

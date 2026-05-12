@@ -80,7 +80,11 @@ def load_legacy_lstm_h5(model_path: str):
 
 
 class LSTMNewsClassifier:
-    """English-text LSTM fake-news scorer (probability of fake)."""
+    """
+    LSTM fake-news scorer. The bundled model was trained on Kannada text
+    (see training.py with USE_TRANSLATION=False), so inference must use the
+    same preprocessing on the original Kannada input — not English translation.
+    """
 
     def __init__(self, model_path: str, tokenizer_path: str, config_path: str):
         import pickle
@@ -91,6 +95,17 @@ class LSTMNewsClassifier:
             self._config = pickle.load(f)
 
     @staticmethod
+    def preprocess_training_match(text: str) -> str:
+        """Match training.py preprocess_text (Kannada / Unicode word tokens)."""
+        import re
+
+        if not str(text).strip():
+            return ""
+        text = str(text)
+        text = re.sub(r"[^\w\s]", " ", text)
+        return " ".join(text.split()).strip()
+
+    @staticmethod
     def preprocess_english(text: str) -> str:
         import re
 
@@ -99,13 +114,17 @@ class LSTMNewsClassifier:
         text = " ".join(text.split())
         return text.strip().lower()
 
-    def predict_fake_probability(self, english_text: str) -> Tuple[float, str]:
+    def predict_fake_probability(self, kannada_text: str) -> Tuple[float, str]:
+        """
+        Return (P(fake), status). Expects original Kannada news text so tokenizer
+        and embedding align with training.
+        """
         from tensorflow.keras.preprocessing.sequence import pad_sequences
 
         if self._model is None:
             return 0.5, "Model not available"
-        cleaned = self.preprocess_english(english_text)
-        if len(cleaned) < 5:
+        cleaned = self.preprocess_training_match(kannada_text)
+        if len(cleaned) < 3:
             return 0.5, "Text too short for reliable prediction"
         sequence = self._tokenizer.texts_to_sequences([cleaned])
         if not sequence or len(sequence[0]) == 0:

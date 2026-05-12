@@ -33,3 +33,9 @@ class Settings:
     WARMUP_TRANSLATOR = os.environ.get("WARMUP_TRANSLATOR", "0") == "1"
 
     TORCH_NUM_THREADS = int(os.environ.get("TORCH_NUM_THREADS", "4"))
+
+    # LSTM was trained on Kannada labels: 0=real, 1=fake. Output is P(fake).
+    # Raise threshold to reduce false "FAKE" when the model is uncertain or miscalibrated.
+    LSTM_FAKE_THRESHOLD = float(os.environ.get("LSTM_FAKE_THRESHOLD", "0.55"))
+    # If |P(fake)-0.5| <= margin, treat as uncertain and label ORIGINAL (safe default).
+    LSTM_UNCERTAIN_MARGIN = float(os.environ.get("LSTM_UNCERTAIN_MARGIN", "0.08"))
